@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "258210542980",
+    "project_id": "kivix-8a820",
+    "storage_bucket": "kivix-8a820.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:258210542980:android:017792baf5ea8d2b4619d1",
+        "android_client_info": {
+          "package_name": "com.kivix"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "258210542980-f28h2810r7m5folu5lmiuobnouovssgk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsIoQT2PY_Nj6bp7P8awBVW5zLCg8W0NM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "258210542980-f28h2810r7m5folu5lmiuobnouovssgk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
