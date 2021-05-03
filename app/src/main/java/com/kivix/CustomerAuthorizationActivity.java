@@ -3,6 +3,7 @@ package com.kivix;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -59,6 +60,9 @@ public class CustomerAuthorizationActivity extends AppCompatActivity {
             public void onComplete(@NonNull Task<AuthResult> task) {
                 if (task.isSuccessful()) {
                     Toast.makeText(CustomerAuthorizationActivity.this, "Customer Login completed", Toast.LENGTH_SHORT).show();
+
+                    Intent customerIntent = new Intent(CustomerAuthorizationActivity.this, CustomersMapAcitvity.class);
+                    startActivity(customerIntent);
                 }
                 else {
                     Toast.makeText(CustomerAuthorizationActivity.this, "Error 404", Toast.LENGTH_SHORT).show();
@@ -75,6 +79,8 @@ public class CustomerAuthorizationActivity extends AppCompatActivity {
                 public void onComplete(@NonNull Task<AuthResult> task) {
                     if (task.isSuccessful()) {
                         Toast.makeText(CustomerAuthorizationActivity.this, "Registration completed", Toast.LENGTH_SHORT).show();
+                        Intent customerIntent = new Intent(CustomerAuthorizationActivity.this, CustomersMapAcitvity.class);
+                        startActivity(customerIntent);
                     }
                     else {
                         Toast.makeText(CustomerAuthorizationActivity.this, "Error 404", Toast.LENGTH_SHORT).show();

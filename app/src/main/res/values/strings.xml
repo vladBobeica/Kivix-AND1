@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Kivix</string>
     <string name="title_activity_driver_map">Map</string>
+    <string name="title_activity_customers_map_acitvity">Map</string>
 
 
 </resources>

@@ -7,10 +7,16 @@ import androidx.fragment.app.FragmentActivity;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 
+import com.firebase.geofire.GeoFire;
+import com.firebase.geofire.GeoLocation;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -21,6 +27,10 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 public class DriverMapActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -28,15 +38,53 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
     private int ACCESS_LOCATION_REQUEST_CODE = 1001;
     FusedLocationProviderClient fusedLocationProviderClient;
 
+    private Button LogOutDriverButton, SettingsDriverButton;
+    private FirebaseAuth mAuth;
+    private FirebaseUser currentUser;
+    private boolean LogoutState;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_driver_map);
+
+        mAuth = FirebaseAuth.getInstance();
+        currentUser = mAuth.getCurrentUser();
+        LogOutDriverButton = (Button)findViewById(R.id.driverLogout);
+        SettingsDriverButton = (Button)findViewById(R.id.settingsButtonDriver);
+
+        LogOutDriverButton.setOnClickListener(v -> {
+
+            LogoutState = true;
+            mAuth.signOut();
+            DisconnectDriver();
+            LogOutDriver();
+
+        });
+
+        /*LogOutDriverButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                LogoutState = true;
+                mAuth.signOut();
+                DisconnectDriver();
+                LogOutDriver();
+            }
+        });
+                */
+
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+    }
+
+    private void LogOutDriver() {
+        Intent WelcomeIntent = new Intent(DriverMapActivity.this, WelcomeActivity.class);
+        startActivity(WelcomeIntent);
+        finish();
     }
 
     /**
@@ -68,11 +116,9 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
             }
         }
 
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+
     }
+
 
 
     private void zoomToUserLocation() {
@@ -89,9 +135,13 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
         Task<Location> locationTask = fusedLocationProviderClient.getLastLocation();
         locationTask.addOnSuccessListener(new OnSuccessListener<Location>() {
             @Override
-            public void onSuccess(Location location) {
+           public void onSuccess(Location location) {
                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 20));
+                String userID = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                DatabaseReference DriverAvailabilityRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Driver_Availability");
+                GeoFire geoFire = new GeoFire(DriverAvailabilityRef);
+                geoFire.setLocation(userID, new GeoLocation(location.getLatitude(),location.getLongitude()));
             }
         });
 
@@ -122,5 +172,25 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
                 //Dialog if permission not granted.
             }
         }
+
     }
+
+    @Override
+    protected void onStop() {
+        if (!LogoutState) {
+            DisconnectDriver();
+            super.onStop();
+
+        }
+    }
+
+    private void DisconnectDriver() {
+            String userID = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            DatabaseReference DriverAvailabilityRef = FirebaseDatabase.getInstance().getReference().child("Driver Available");
+
+            GeoFire geoFire = new GeoFire(DriverAvailabilityRef);
+            geoFire.removeLocation(userID);
+    }
+
+
 }
