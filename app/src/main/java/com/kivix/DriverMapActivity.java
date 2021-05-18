@@ -29,19 +29,27 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
-public class DriverMapActivity extends FragmentActivity implements OnMapReadyCallback {
+import java.util.List;
+
+public class  DriverMapActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
     private int ACCESS_LOCATION_REQUEST_CODE = 1001;
     FusedLocationProviderClient fusedLocationProviderClient;
+    Location lastLocation;
 
     private Button LogOutDriverButton, SettingsDriverButton;
     private FirebaseAuth mAuth;
     private FirebaseUser currentUser;
     private boolean LogoutState;
+    private DatabaseReference assignedCustomerRef, AssignedCustomerPositionRef;
+    private String driverID , customerID = "" ;
 
 
     @Override
@@ -51,6 +59,7 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
 
         mAuth = FirebaseAuth.getInstance();
         currentUser = mAuth.getCurrentUser();
+        driverID = mAuth.getCurrentUser().getUid();
         LogOutDriverButton = (Button)findViewById(R.id.driverLogout);
         SettingsDriverButton = (Button)findViewById(R.id.settingsButtonDriver);
 
@@ -63,22 +72,66 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
 
         });
 
-        /*LogOutDriverButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                LogoutState = true;
-                mAuth.signOut();
-                DisconnectDriver();
-                LogOutDriver();
-            }
-        });
-                */
 
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+
+        getAssignedCustomerRequest();
+    }
+
+    private void getAssignedCustomerRequest() {
+
+        assignedCustomerRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Users").child("Drivers").child(driverID).child("customerRideID");
+        assignedCustomerRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    customerID = dataSnapshot.getValue().toString();
+
+                    getAssignedCustomerPosition();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    private void getAssignedCustomerPosition() {
+        AssignedCustomerPositionRef = FirebaseDatabase.getInstance().getReference().child("Customer Request").child(customerID).child("l");
+        AssignedCustomerPositionRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    List<Object> customerPositionMap = (List<Object>) dataSnapshot.getValue();
+                    double LocationLat = 0;
+                    double LocationLong = 0;
+
+                    if (customerPositionMap.get(0) != null) {
+                        LocationLat = Double.parseDouble(customerPositionMap.get(0).toString());
+
+                    }
+
+                    if (customerPositionMap.get(1) != null) {
+                        LocationLong = Double.parseDouble(customerPositionMap.get(1).toString());
+
+                    }
+
+                    LatLng DriverLatLong = new LatLng(LocationLat, LocationLong);
+                    mMap.addMarker(new MarkerOptions().position(DriverLatLong).title("Take the client from here"));
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+
+            }
+        });
+
     }
 
     private void LogOutDriver() {
@@ -136,12 +189,30 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
         locationTask.addOnSuccessListener(new OnSuccessListener<Location>() {
             @Override
            public void onSuccess(Location location) {
-                LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 20));
-                String userID = FirebaseAuth.getInstance().getCurrentUser().getUid();
-                DatabaseReference DriverAvailabilityRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Driver_Availability");
-                GeoFire geoFire = new GeoFire(DriverAvailabilityRef);
-                geoFire.setLocation(userID, new GeoLocation(location.getLatitude(),location.getLongitude()));
+                if (getApplicationContext() != null) {
+                    lastLocation = location;
+
+                    LatLng latLng = new LatLng( location.getLongitude(), location.getLatitude());
+                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 20));
+                    String userID = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                    DatabaseReference DriverAvailabilityRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Driver Availability");
+                    DatabaseReference DriverWorkingRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Driver Working");
+                    GeoFire geoFireAvailability = new GeoFire(DriverAvailabilityRef);
+                    GeoFire geoFireWorking = new GeoFire(DriverWorkingRef);
+
+
+                    switch (customerID) {
+                        case "":
+                            geoFireWorking.removeLocation(userID);
+                            geoFireAvailability.setLocation(userID, new GeoLocation(location.getLatitude(),location.getLongitude()));
+                            break;
+                        default:
+                            geoFireAvailability.removeLocation(userID);
+                            geoFireWorking.setLocation(userID, new GeoLocation(location.getLatitude(),location.getLongitude()));
+                            break;
+                    }
+
+                }
             }
         });
 
@@ -186,7 +257,7 @@ public class DriverMapActivity extends FragmentActivity implements OnMapReadyCal
 
     private void DisconnectDriver() {
             String userID = FirebaseAuth.getInstance().getCurrentUser().getUid();
-            DatabaseReference DriverAvailabilityRef = FirebaseDatabase.getInstance().getReference().child("Driver Available");
+            DatabaseReference DriverAvailabilityRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Driver Available");
 
             GeoFire geoFire = new GeoFire(DriverAvailabilityRef);
             geoFire.removeLocation(userID);

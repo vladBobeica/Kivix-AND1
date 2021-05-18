@@ -1,5 +1,6 @@
 package com.kivix;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
@@ -15,6 +16,8 @@ import android.widget.EditText;
 
 import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
+import com.firebase.geofire.GeoQuery;
+import com.firebase.geofire.GeoQueryEventListener;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -22,13 +25,20 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.util.HashMap;
+import java.util.List;
 
 public class CustomersMapAcitvity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -37,11 +47,19 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
     FusedLocationProviderClient fusedLocationProviderClient;
     private int ACCESS_LOCATION_REQUEST_CODE = 1001;
     private FirebaseAuth mAuth;
+    Marker driverMarker;
     private FirebaseUser currentUser;
     private boolean LogoutState;
     private String customerID;
     private DatabaseReference CustomerDatabaseRef;
     private LatLng CustomerPosition;
+    private DatabaseReference DriversAvailabilityRef;
+    private DatabaseReference DriversRef;
+    private DatabaseReference DriversLocationRef;
+
+    private int radius = 1;
+    private boolean driverFound = false;
+    private String driverFoundID;
 
     private Button customerLogoutButton;
     private Button orderTaxiButton;
@@ -57,6 +75,8 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
         customerID = FirebaseAuth.getInstance().getCurrentUser().getUid();
         currentUser = mAuth.getCurrentUser();
         CustomerDatabaseRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Customers Requests");
+        DriversAvailabilityRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Driver Availability");
+        DriversLocationRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Driver working");
         customerLogoutButton = (Button) findViewById(R.id.customerLogoutBtn);
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -70,6 +90,9 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
 
                 CustomerPosition = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
                 mMap.addMarker(new MarkerOptions().position(CustomerPosition).title("The customer is here."));
+
+                orderTaxiButton.setText("Looking for drivers");
+                getNearbyDrivers();
             }
         });
         customerLogoutButton.setOnClickListener(new View.OnClickListener() {
@@ -83,15 +106,9 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
         });
     }
 
+
     private void enableUserLocation() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             return;
         }
         mMap.setMyLocationEnabled(true);
@@ -100,13 +117,6 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
 
     private void zoomToUserLocation() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             return;
         }
         Task<Location> locationTask = fusedLocationProviderClient.getLastLocation();
@@ -123,15 +133,6 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
     }
 
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
@@ -155,7 +156,7 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
 
     private void DisconnectCustomer() {
         String userID = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference CustomerAvailabilityRef = FirebaseDatabase.getInstance().getReference().child("Customer Available");
+        DatabaseReference CustomerAvailabilityRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Customer Available");
 
         GeoFire geoFire = new GeoFire(CustomerAvailabilityRef);
         geoFire.removeLocation(userID);
@@ -174,6 +175,100 @@ public class CustomersMapAcitvity extends FragmentActivity implements OnMapReady
             super.onStop();
 
         }
+    }
+
+    private void getNearbyDrivers() {
+        GeoFire geoFire = new GeoFire(DriversAvailabilityRef);
+        GeoQuery geoQuery = geoFire.queryAtLocation(new GeoLocation(CustomerPosition.latitude, CustomerPosition.longitude), radius);
+        geoQuery.removeAllListeners();
+        geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
+            @Override
+            public void onKeyEntered(String key, GeoLocation location) {
+                if (!driverFound) {
+                    driverFound = true;
+                    driverFoundID = key;
+
+                    DriversRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Users").child("Drivers").child(driverFoundID);
+                    HashMap driverMap = new HashMap();
+                    driverMap.put("customerRideID", customerID);
+                    DriversRef.updateChildren(driverMap);
+
+                    GetDriverLocation();
+                }
+            }
+
+            @Override
+            public void onKeyExited(String key) {
+
+            }
+
+            @Override
+            public void onKeyMoved(String key, GeoLocation location) {
+
+            }
+
+            @Override
+            public void onGeoQueryReady() {
+                if (!driverFound) {
+                    radius++;
+                    getNearbyDrivers();
+                }
+
+            }
+
+            @Override
+            public void onGeoQueryError(DatabaseError error) {
+
+            }
+        });
+    }
+
+    private void GetDriverLocation() {
+            DriversLocationRef.child(driverFoundID).child("l").addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    if (dataSnapshot.exists()) {
+                        List<Object> driverLocationMap = (List<Object>) dataSnapshot.getValue();
+                        double LocationLat = 0;
+                        double LocationLong = 0;
+                        orderTaxiButton.setText("Driver founded");
+
+                        if (driverLocationMap.get(0) != null) {
+                            LocationLat = Double.parseDouble(driverLocationMap.get(0).toString());
+
+                        }
+
+                        if (driverLocationMap.get(1) != null) {
+                            LocationLong = Double.parseDouble(driverLocationMap.get(1).toString());
+
+                        }
+
+                        LatLng DriverLatLong = new LatLng(LocationLat, LocationLong);
+
+                        if (driverMarker != null) {
+                            driverMarker.remove();
+                        }
+
+                        Location location1 = new Location("");
+                        location1.setLatitude(CustomerPosition.latitude);
+                        location1.setLongitude(CustomerPosition.longitude);
+
+                        Location location2 = new Location("");
+                        location2.setLatitude(DriverLatLong.latitude);
+                        location2.setLongitude(DriverLatLong.longitude);
+
+                        float Distance = location1.distanceTo(location2);
+                        orderTaxiButton.setText("Distance to taxi" + String.valueOf(Distance));
+                        driverMarker = mMap.addMarker(new MarkerOptions().position(DriverLatLong).title("Your taxi is here"));
+
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+
+                }
+            });
     }
 
 }

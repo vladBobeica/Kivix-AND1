@@ -14,12 +14,16 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 public class CustomerAuthorizationActivity extends AppCompatActivity {
 
     Button signinBtn, signupBtn;
     EditText emailEdit, passwordEdit;
     FirebaseAuth customerAuth;
+    DatabaseReference customerDatabaseRef;
+    String onlineCustomerID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,6 +35,7 @@ public class CustomerAuthorizationActivity extends AppCompatActivity {
         signupBtn = (Button) findViewById(R.id.signupcustomer);
         emailEdit = (EditText) findViewById(R.id.customerEmail);
         passwordEdit = (EditText) findViewById(R.id.customerPassword);
+
 
         signupBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -78,6 +83,9 @@ public class CustomerAuthorizationActivity extends AppCompatActivity {
                 @Override
                 public void onComplete(@NonNull Task<AuthResult> task) {
                     if (task.isSuccessful()) {
+                        customerDatabaseRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Users").child("Customers").child(onlineCustomerID);
+                        onlineCustomerID = customerAuth.getCurrentUser().getUid();
+                        customerDatabaseRef.setValue(true);
                         Toast.makeText(CustomerAuthorizationActivity.this, "Registration completed", Toast.LENGTH_SHORT).show();
                         Intent customerIntent = new Intent(CustomerAuthorizationActivity.this, CustomersMapAcitvity.class);
                         startActivity(customerIntent);

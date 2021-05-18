@@ -14,12 +14,16 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 public class DriverAuthorizationActivity extends AppCompatActivity {
 
     Button signinBtn, signupBtn;
     EditText emailEdit, passwordEdit;
     FirebaseAuth auth;
+    DatabaseReference driverDatabaseRef;
+    String onlineDriverID = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +63,9 @@ public class DriverAuthorizationActivity extends AppCompatActivity {
             @Override
             public void onComplete(@NonNull Task<AuthResult> task) {
                 if (task.isSuccessful()){
+                    driverDatabaseRef = FirebaseDatabase.getInstance("https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/").getReference().child("Users").child("Drivers").child(onlineDriverID);
+                    onlineDriverID = auth.getCurrentUser().getUid();
+                    driverDatabaseRef.setValue(true);
                     Toast.makeText(DriverAuthorizationActivity.this, "Registration completed", Toast.LENGTH_SHORT).show();
                     Intent driverIntent = new Intent(DriverAuthorizationActivity.this, DriverMapActivity.class);
                     startActivity(driverIntent);
