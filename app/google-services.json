@@ -2,6 +2,7 @@
   "project_info": {
     "project_number": "258210542980",
     "project_id": "kivix-8a820",
+    "firebase_url": "https://kivix-8a820-default-rtdb.europe-west1.firebasedatabase.app/",
     "storage_bucket": "kivix-8a820.appspot.com"
   },
   "client": [

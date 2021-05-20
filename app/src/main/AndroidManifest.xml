@@ -33,8 +33,10 @@
             android:value="@string/google_maps_key" />
 
         <activity
-            android:name=".CustomersMapAcitvity"
-            android:label="@string/title_activity_customers_map_acitvity"></activity>
+            android:name=".CustomersMapActivity"
+            android:label="@string/title_activity_customers_map_acitvity">
+
+        </activity>
         <activity
             android:name=".DriverMapActivity"
             android:label="@string/title_activity_driver_map" />
